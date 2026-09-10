@@ -5,8 +5,10 @@ from .comment import Comment
 from .event import Event
 from .note import Note
 from .notification import Notification
+from .password_reset_token import PasswordResetToken
 from .project import Project
 from .project_member import ProjectMember
+from .refresh_session import RefreshSession
 from .reminder import Reminder
 from .tag import Tag
 from .task import Task
@@ -23,8 +25,10 @@ __all__ = [
     "Event",
     "Note",
     "Notification",
+    "PasswordResetToken",
     "Project",
     "ProjectMember",
+    "RefreshSession",
     "Reminder",
     "Tag",
     "Task",

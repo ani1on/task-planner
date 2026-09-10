@@ -46,9 +46,7 @@ class User(Base):
     )
 
     email_verified: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        server_default=false(),
+        Boolean, nullable=False, server_default=false(), default=False
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -62,6 +60,12 @@ class User(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    refresh_sessions = relationship(
+        "RefreshSession",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
     settings: Mapped["UserSetting"] = relationship(

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str
     jwt_access_token_expire_minutes: int
     jwt_refresh_token_expire_days: int
+    jwt_password_reset_token_expire_minutes: int = 30
 
     # CORS
     cors_origins: str
