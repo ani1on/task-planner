@@ -445,3 +445,7 @@ alembic upgrade head
 Если запомнить только одну последовательность:
 
 Model → revision --autogenerate → проверить migration → upgrade head → PostgreSQL.
+
+Проверка бд:
+ docker compose up -d
+ docker exec -it task-planner-postgres psql -U task_planner -d task_planner
