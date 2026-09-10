@@ -5,12 +5,21 @@ from server.main import app
 client = TestClient(app)
 
 
-def test_health():
+def test_health() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {
+        "status": "ok",
+    }
 
 
-def test_basic():
-    assert 1 + 1 == 2
+def test_database_health() -> None:
+    response = client.get("/health/db")
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "status": "ok",
+        "database": "connected",
+    }
