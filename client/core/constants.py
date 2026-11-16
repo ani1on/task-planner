@@ -72,3 +72,12 @@ PROJECT_COLORS = {
     "red": "#dc2626",
     "teal": "#0d9488",
 }
+
+PROJECT_COLOR_LABELS = {
+    "blue": "Синий",
+    "green": "Зелёный",
+    "purple": "Фиолетовый",
+    "orange": "Оранжевый",
+    "red": "Красный",
+    "teal": "Бирюзовый",
+}

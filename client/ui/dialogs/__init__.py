@@ -3,6 +3,8 @@ from .confirm import ConfirmDialog
 from .error import ErrorDialog
 from .password import PasswordDialog
 from .profile import ProfileDialog
+from .project import ProjectDialog
+from .task import TaskDialog
 
 __all__ = [
     "BaseDialog",
@@ -10,4 +12,6 @@ __all__ = [
     "ErrorDialog",
     "PasswordDialog",
     "ProfileDialog",
+    "ProjectDialog",
+    "TaskDialog",
 ]

@@ -2,7 +2,11 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class FormField(QWidget):
-    """Поле формы: подпись, ввод, подсказка и текст ошибки."""
+    """Поле формы: подпись, ввод, подсказка и текст ошибки.
+
+    Поле поддерживает не только QLineEdit, но и QComboBox, QPlainTextEdit
+    и QDateTimeEdit: подписка на изменения подбирается по доступному сигналу.
+    """
 
     def __init__(
         self,
@@ -38,9 +42,28 @@ class FormField(QWidget):
 
         layout.addWidget(self.error)
 
-        self.field.textChanged.connect(self.clear_error)
+        self._connect_change_signal()
 
-    def value(self) -> str:
+    def _connect_change_signal(self):
+        for name in (
+            "textChanged",
+            "currentIndexChanged",
+            "dateTimeChanged",
+        ):
+            signal = getattr(self.field, name, None)
+
+            if signal is not None:
+                signal.connect(lambda *_: self.clear_error())
+                return
+
+    def value(self):
+        """Возвращает значение поля в зависимости от типа виджета."""
+        if hasattr(self.field, "currentData"):
+            return self.field.currentData()
+
+        if hasattr(self.field, "toPlainText"):
+            return self.field.toPlainText().strip()
+
         return self.field.text()
 
     def set_error(self, message: str):
