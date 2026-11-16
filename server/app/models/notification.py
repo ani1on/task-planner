@@ -51,6 +51,7 @@ class Notification(Base):
         Boolean,
         nullable=False,
         server_default="false",
+        default=False,
         index=True,
     )
 

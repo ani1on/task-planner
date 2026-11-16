@@ -1,21 +1,23 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..database import Base
+
+BigInt = BigInteger().with_variant(Integer, "sqlite")
 
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         primary_key=True,
     )
 
     user_id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigInt,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

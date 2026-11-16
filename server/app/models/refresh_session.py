@@ -1,16 +1,20 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
 
+# SQLite автоинкрементирует только INTEGER PRIMARY KEY,
+# поэтому для тестовой базы тип сужается до Integer.
+BigInt = BigInteger().with_variant(Integer, "sqlite")
+
 
 class RefreshSession(Base):
     __tablename__ = "refresh_sessions"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id: Mapped[int] = mapped_column(BigInt, primary_key=True)
 
     user_id: Mapped[int] = mapped_column(
         BigInteger,

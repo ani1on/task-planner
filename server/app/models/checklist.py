@@ -34,6 +34,7 @@ class Checklist(Base):
         Integer,
         nullable=False,
         server_default="0",
+        default=0,
     )
 
     created_at: Mapped[datetime] = mapped_column(

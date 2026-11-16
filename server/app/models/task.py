@@ -81,6 +81,7 @@ class Task(Base):
         Integer,
         nullable=False,
         server_default="0",
+        default=0,
     )
 
     start_at: Mapped[datetime | None] = mapped_column(

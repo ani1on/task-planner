@@ -46,6 +46,7 @@ class Note(Base):
         Boolean,
         nullable=False,
         server_default="false",
+        default=False,
     )
 
     created_at: Mapped[datetime] = mapped_column(

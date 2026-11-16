@@ -34,6 +34,7 @@ class TaskRecurrence(Base):
         Integer,
         nullable=False,
         server_default="1",
+        default=1,
     )
 
     days_of_week: Mapped[list | None] = mapped_column(
@@ -66,6 +67,7 @@ class TaskRecurrence(Base):
         Boolean,
         nullable=False,
         server_default="true",
+        default=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

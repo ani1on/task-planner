@@ -57,6 +57,7 @@ class Event(Base):
         Boolean,
         nullable=False,
         server_default="false",
+        default=False,
     )
 
     location: Mapped[str | None] = mapped_column(
