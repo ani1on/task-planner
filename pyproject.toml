@@ -71,6 +71,23 @@ line-length = 88
 target-version = "py310"
 extend-exclude = ["__pycache__", ".git", ".venv", "venv", ".env"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI передаёт зависимости и параметры запроса через значения по умолчанию.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# UI-слой обрабатывает ошибки API на границе и держит ссылку на QApplication.
+"client/**" = ["BLE001", "F841"]
+
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
