@@ -464,3 +464,75 @@ QLabel[component="read-dot"] {
     border: 1px solid #3f3f47;
     border-radius: 4px;
 }
+
+/* ===== Forms, menus & dialogs ===== */
+
+QDialog {
+    background-color: #131316;
+}
+
+QComboBox,
+QDateTimeEdit,
+QPlainTextEdit {
+    background-color: #1c1c20;
+    color: #f4f4f5;
+    border: 1px solid #2f2f36;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QComboBox:focus,
+QDateTimeEdit:focus,
+QPlainTextEdit:focus {
+    border: 1px solid #3b82f6;
+}
+
+QComboBox:disabled {
+    background-color: #1c1c20;
+    color: #6b6b75;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 22px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1c1c20;
+    color: #f4f4f5;
+    border: 1px solid #2f2f36;
+    border-radius: 8px;
+    padding: 4px;
+    outline: none;
+    selection-background-color: #2a2a31;
+    selection-color: #f4f4f5;
+}
+
+QComboBox[invalid="true"],
+QDateTimeEdit[invalid="true"],
+QPlainTextEdit[invalid="true"] {
+    border: 1px solid #dc2626;
+}
+
+QMenu {
+    background-color: #1c1c20;
+    border: 1px solid #2f2f36;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+QMenu::item {
+    padding: 6px 18px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background-color: #2a2a31;
+    color: #f4f4f5;
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: #2f2f36;
+    margin: 4px 6px;
+}
