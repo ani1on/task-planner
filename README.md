@@ -115,3 +115,73 @@ Task Planner — это комплексная система управлени
 ```
 
 ---
+
+## 🔌 Backend API
+
+Все маршруты (кроме `/health` и `/auth/*`) требуют заголовок
+`Authorization: Bearer <access_token>`.
+
+| Группа | Маршруты |
+| --- | --- |
+| Auth | `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/change-password`, `POST /auth/forgot-password`, `POST /auth/reset-password` |
+| Projects | `GET/POST /projects`, `GET/PATCH/DELETE /projects/{id}`, `POST /projects/{id}/archive`, `GET /projects/{id}/progress` |
+| Members | `GET/POST /projects/{id}/members`, `PATCH/DELETE /projects/{id}/members/{user_id}` |
+| Tasks | `GET/POST /tasks`, `GET/PATCH/DELETE /tasks/{id}`, `GET/POST /tasks/{id}/subtasks`, `GET /tasks/{id}/subtasks/progress` |
+| Task tags | `GET /tasks/{id}/tags`, `POST/DELETE /tasks/{id}/tags/{tag_id}` |
+| Recurrence | `GET/PUT/PATCH/DELETE /tasks/{id}/recurrence`, `POST /tasks/{id}/next-occurrence` |
+| Tags | `GET/POST /tags`, `GET/PATCH/DELETE /tags/{id}` |
+| Checklists | `GET/POST /checklists`, `GET/PATCH/DELETE /checklists/{id}`, `GET/POST /checklists/{id}/items`, `PATCH/DELETE /checklist-items/{id}` |
+| Comments | `GET/POST /comments`, `GET/PATCH/DELETE /comments/{id}` |
+| Notes | `GET/POST /notes`, `GET/PATCH/DELETE /notes/{id}` |
+| Events | `GET/POST /events`, `GET/PATCH/DELETE /events/{id}` |
+| Reminders | `GET/POST /reminders`, `GET/PATCH/DELETE /reminders/{id}`, `POST /reminders/process-due` |
+| Notifications | `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/read-all` |
+| Activity | `GET /activity?project_id=&task_id=` |
+| Dashboard | `GET /dashboard` |
+| Search | `GET /search?q=` |
+| Profile | `GET/PATCH /users/me`, `GET/PATCH /users/me/settings` |
+| Health | `GET /health`, `GET /health/db` |
+| Realtime | `WS /ws?token=<access_token>` |
+
+### Права доступа
+
+В проекте четыре роли: `owner`, `admin`, `member`, `viewer`.
+Просмотр доступен всем участникам, изменение задач — `member` и выше,
+управление участниками — `admin` и `owner`. Доступ к проектам и задачам
+проверяется через `project_members`, поэтому чужие данные возвращают `404`.
+
+### WebSocket
+
+Клиент подключается к `/ws?token=<access_token>` и может отправлять команды:
+
+```json
+{"action": "ping"}
+{"action": "join_project", "project_id": 1}
+{"action": "leave_project", "project_id": 1}
+```
+
+События проекта (`task_created`, `task_updated`, `task_deleted`, `task_assigned`,
+`comment_created`, `member_added`, `member_removed`, `project_updated`) приходят
+в комнату `project:{id}`, уведомления и напоминания — в комнату `user:{id}`.
+
+### Напоминания
+
+Напоминания можно обрабатывать вручную (`POST /reminders/process-due`) или
+фоновым воркером: `REMINDERS_WORKER_ENABLED=True` в `.env`.
+
+### Защита dev-маршрутов
+
+Маршруты `/dev/*` подключаются только когда `APP_ENV != production`.
+В production они недоступны.
+
+---
+
+## 🧪 Тесты и линтеры
+
+```powershell
+.\venv\Scripts\python.exe -m pytest
+.\venv\Scripts\python.exe -m ruff check .
+```
+
+Тесты используют изолированную SQLite-базу во временном каталоге
+(`server/tests/conftest.py`), поэтому запущенный PostgreSQL и Docker не нужны.
