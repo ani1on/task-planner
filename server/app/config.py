@@ -30,6 +30,24 @@ class Settings(BaseSettings):
     # Logging
     log_level: str
 
+    # Rate limiting
+    rate_limit_enabled: bool = True
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
+
+    # Reminders worker
+    reminders_worker_enabled: bool = False
+    reminders_worker_interval_seconds: int = 60
+
+    # Email
+    frontend_url: str = "http://localhost:3000"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "no-reply@task-planner.local"
+    smtp_use_tls: bool = True
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
