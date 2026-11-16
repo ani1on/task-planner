@@ -11,10 +11,11 @@ from client.api.mapper import (
     project_view,
     task_view,
 )
-from client.api.models import Dashboard
+from client.api.models import Dashboard, Task
 from client.core.constants import PROJECT_COLORS
 from client.core.worker import run_async
 from client.services.dashboard import DashboardService
+from client.services.projects import ProjectService
 from client.ui.components import (
     EmptyState,
     PrimaryButton,
@@ -23,6 +24,7 @@ from client.ui.components import (
     StatCard,
     TaskCard,
 )
+from client.ui.crud_actions import TaskActionsMixin
 from client.ui.error_handler import error_message
 from client.ui.mock_data import (
     dashboard_stats,
@@ -74,15 +76,19 @@ class ProjectProgressRow(QFrame):
         layout.addWidget(progress)
 
 
-class DashboardPage(BasePage):
+class DashboardPage(TaskActionsMixin, BasePage):
     def __init__(self, api: ApiClient | None = None, demo: bool = False, parent=None):
         super().__init__("Дашборд", "Обзор задач, проектов и активности")
 
         self.api = api
         self.demo = demo
         self.dashboard_service = DashboardService(api) if api else None
+        self.project_service = ProjectService(api) if api else None
+
+        self._task_models: dict[int, Task] = {}
 
         create_button = PrimaryButton("Новая задача", "plus")
+        create_button.clicked.connect(lambda: self.open_task_dialog())
         self.add_action(create_button)
 
     # ------------------------------------------------------------------
@@ -110,12 +116,18 @@ class DashboardPage(BasePage):
     # ------------------------------------------------------------------
 
     def _render(self, dashboard: Dashboard):
+        self._task_models = {
+            task.id: task for task in dashboard.upcoming_tasks
+        }
+
         self.clear_content()
 
         self._build_stats(dashboard_stats_view(dashboard.stats))
         self._build_columns(dashboard)
 
     def _render_demo(self):
+        self._task_models = {}
+
         self.clear_content()
 
         self._build_stats(dashboard_stats())
@@ -178,7 +190,14 @@ class DashboardPage(BasePage):
             layout.addWidget(EmptyState("На сегодня задач нет"))
         else:
             for task in tasks:
-                layout.addWidget(TaskCard(task))
+                card = TaskCard(task)
+
+                card.activated.connect(self.edit_task)
+                card.edit_requested.connect(self.edit_task)
+                card.completion_changed.connect(self.toggle_task)
+                card.delete_requested.connect(self.delete_task)
+
+                layout.addWidget(card)
 
         layout.addStretch()
 

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from client.api.client import ApiClient
 from client.api.mapper import task_view
+from client.api.models import Task
 from client.core.worker import run_async
 from client.services.projects import ProjectService
 from client.services.tasks import TaskService
@@ -20,6 +21,7 @@ from client.ui.components import (
     SecondaryButton,
     TaskCard,
 )
+from client.ui.crud_actions import TaskActionsMixin
 from client.ui.error_handler import error_message
 from client.ui.mock_data import tasks
 
@@ -58,7 +60,7 @@ def matches_filter(task: dict, key: str) -> bool:
     return True
 
 
-class TasksPage(BasePage):
+class TasksPage(TaskActionsMixin, BasePage):
     def __init__(self, api: ApiClient | None = None, demo: bool = False, parent=None):
         super().__init__("Задачи", "Все задачи вашей команды")
 
@@ -69,9 +71,12 @@ class TasksPage(BasePage):
         self.project_service = ProjectService(api) if api else None
 
         self.all_tasks: list[dict] = []
+        self._task_models: dict[int, Task] = {}
         self.active_filter = "all"
 
-        self.add_action(PrimaryButton("Новая задача", "plus"))
+        create_button = PrimaryButton("Новая задача", "plus")
+        create_button.clicked.connect(lambda: self.open_task_dialog())
+        self.add_action(create_button)
 
         self._build_filters()
 
@@ -111,7 +116,7 @@ class TasksPage(BasePage):
 
     def reload(self):
         if self.demo or self.task_service is None:
-            self._set_tasks(tasks())
+            self._set_tasks({"views": tasks(), "models": {}})
             return
 
         clear_layout(self.tasks_layout)
@@ -119,13 +124,16 @@ class TasksPage(BasePage):
 
         run_async(self._load, self._set_tasks, self._show_error)
 
-    def _load(self) -> list[dict]:
+    def _load(self) -> dict:
         tasks_data = self.task_service.list()
         projects = self.project_service.list() if self.project_service else []
 
         project_names = {project.id: project.name for project in projects}
 
-        return [task_view(task, project_names) for task in tasks_data]
+        return {
+            "views": [task_view(task, project_names) for task in tasks_data],
+            "models": {task.id: task for task in tasks_data},
+        }
 
     def _show_error(self, error: Exception):
         clear_layout(self.tasks_layout)
@@ -145,8 +153,9 @@ class TasksPage(BasePage):
             self.active_filter = FILTERS[index][0]
             self._render_tasks()
 
-    def _set_tasks(self, tasks_data: list[dict]):
-        self.all_tasks = tasks_data
+    def _set_tasks(self, data: dict):
+        self._task_models = data["models"]
+        self.all_tasks = data["views"]
         self._render_tasks()
 
     def _render_tasks(self):
@@ -163,4 +172,11 @@ class TasksPage(BasePage):
             return
 
         for task in filtered:
-            self.tasks_layout.addWidget(TaskCard(task))
+            card = TaskCard(task)
+
+            card.activated.connect(self.edit_task)
+            card.edit_requested.connect(self.edit_task)
+            card.completion_changed.connect(self.toggle_task)
+            card.delete_requested.connect(self.delete_task)
+
+            self.tasks_layout.addWidget(card)

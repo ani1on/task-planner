@@ -31,6 +31,19 @@ class ProjectService:
 
         return [member_from_dict(item) for item in response]
 
+    def members_map(self, project_ids: list[int]) -> dict[int, list[Member]]:
+        """Участники проектов одним словарём (для выбора исполнителя)."""
+        result: dict[int, list[Member]] = {}
+
+        for project_id in project_ids:
+            try:
+                result[project_id] = self.members(project_id)
+            except Exception:
+                # Нет прав или проект удалён — выбор просто будет пустым.
+                result[project_id] = []
+
+        return result
+
     def list_with_members(
         self,
         status: str | None = None,

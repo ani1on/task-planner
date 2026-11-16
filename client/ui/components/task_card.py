@@ -1,9 +1,10 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QVBoxLayout,
 )
 
@@ -15,8 +16,33 @@ from client.core.constants import (
 from .badge import Badge
 
 
+def _task_menu(parent, task: dict) -> tuple[QMenu, dict]:
+    menu = QMenu(parent)
+
+    edit = menu.addAction("Редактировать")
+
+    if task.get("done"):
+        toggle = menu.addAction("Вернуть в работу")
+    else:
+        toggle = menu.addAction("Отметить выполненной")
+
+    menu.addSeparator()
+    delete = menu.addAction("Удалить")
+
+    return menu, {
+        edit: "edit",
+        toggle: "toggle",
+        delete: "delete",
+    }
+
+
 class TaskCard(QFrame):
     """Строка задачи в списке."""
+
+    activated = Signal(int)
+    completion_changed = Signal(int, bool)
+    edit_requested = Signal(int)
+    delete_requested = Signal(int)
 
     def __init__(self, task: dict, parent=None):
         super().__init__(parent)
@@ -78,6 +104,13 @@ class TaskCard(QFrame):
 
         self._apply_done_style(bool(task.get("done")))
 
+    # ------------------------------------------------------------------
+    # Взаимодействие
+    # ------------------------------------------------------------------
+
+    def _task_id(self) -> int:
+        return int(self.task.get("id") or 0)
+
     def _on_toggled(self, checked: bool):
         self.task["done"] = checked
 
@@ -86,6 +119,28 @@ class TaskCard(QFrame):
         self.style().polish(self)
 
         self._apply_done_style(checked)
+
+        self.completion_changed.emit(self._task_id(), checked)
+
+    def mouseDoubleClickEvent(self, event):
+        self.activated.emit(self._task_id())
+
+        super().mouseDoubleClickEvent(event)
+
+    def contextMenuEvent(self, event):
+        menu, actions = _task_menu(self, self.task)
+        action = menu.exec(event.globalPos())
+        kind = actions.get(action)
+
+        if kind == "edit":
+            self.edit_requested.emit(self._task_id())
+        elif kind == "toggle":
+            self.completion_changed.emit(
+                self._task_id(),
+                not self.task.get("done"),
+            )
+        elif kind == "delete":
+            self.delete_requested.emit(self._task_id())
 
     def _apply_done_style(self, done: bool):
         font = self.title_label.font()
@@ -96,8 +151,14 @@ class TaskCard(QFrame):
 class KanbanCard(QFrame):
     """Компактная карточка задачи для канбан-доски."""
 
+    activated = Signal(int)
+    edit_requested = Signal(int)
+    delete_requested = Signal(int)
+
     def __init__(self, task: dict, parent=None):
         super().__init__(parent)
+
+        self.task = task
 
         self.setProperty("component", "task")
         self.setProperty("clickable", "true")
@@ -132,3 +193,21 @@ class KanbanCard(QFrame):
 
         layout.addWidget(title)
         layout.addLayout(footer)
+
+    def _task_id(self) -> int:
+        return int(self.task.get("id") or 0)
+
+    def mouseDoubleClickEvent(self, event):
+        self.activated.emit(self._task_id())
+
+        super().mouseDoubleClickEvent(event)
+
+    def contextMenuEvent(self, event):
+        menu, actions = _task_menu(self, self.task)
+        action = menu.exec(event.globalPos())
+        kind = actions.get(action)
+
+        if kind == "edit":
+            self.edit_requested.emit(self._task_id())
+        elif kind == "delete":
+            self.delete_requested.emit(self._task_id())
