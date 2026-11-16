@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from ...api.deps import get_current_user
+from ...core.ratelimit import rate_limit
 from ...database import get_db
 from ...models.user import User
 from ...schemas.auth import (
@@ -41,6 +42,7 @@ def get_me(
 def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("auth:register")),
 ) -> UserResponse:
     service = AuthService(db)
 
@@ -58,6 +60,7 @@ def register(
 def login(
     data: LoginRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("auth:login")),
 ) -> TokenResponse:
     service = AuthService(db)
 
@@ -75,6 +78,7 @@ def login(
 def refresh(
     data: RefreshTokenRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("auth:refresh")),
 ) -> TokenResponse:
     service = AuthService(db)
 
@@ -123,18 +127,16 @@ def change_password(
 def forgot_password(
     data: ForgotPasswordRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("auth:forgot-password")),
 ) -> MessageResponse:
     service = AuthService(db)
 
-    reset_token = service.forgot_password(data)
+    service.forgot_password(data)
 
     db.commit()
 
-    # todo |На production здесь должен быть вызов email-сервиса.
-    # todo |Важно:
-    # todo |пользователю всегда возвращаем одинаковый ответ,
-    # todo |существует email или нет.
-    # todo |Это предотвращает email enumeration.
+    # Пользователю всегда возвращаем одинаковый ответ, чтобы не раскрывать,
+    # существует email или нет (защита от email enumeration).
 
     return MessageResponse(
         message="If the email is registered, a password reset link has been sent"
@@ -148,6 +150,7 @@ def forgot_password(
 def reset_password(
     data: ResetPasswordRequest,
     db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("auth:reset-password")),
 ) -> MessageResponse:
     service = AuthService(db)
 
