@@ -47,9 +47,19 @@ class CalendarPage(BasePage):
         self.task_service = TaskService(api) if api else None
 
         self.today = date.today()  # noqa: DTZ011
+        self.year = self.today.year
+        self.month = self.today.month
+
+        self._events: list[dict] = []
 
         previous = SecondaryButton("<")
+        previous.setToolTip("Предыдущий месяц")
+
         next_button = SecondaryButton(">")
+        next_button.setToolTip("Следующий месяц")
+
+        previous.clicked.connect(lambda: self._shift_month(-1))
+        next_button.clicked.connect(lambda: self._shift_month(1))
 
         self.month_label = QLabel()
         self.month_label.setProperty("role", "card-title")
@@ -58,13 +68,7 @@ class CalendarPage(BasePage):
         self.add_action(self.month_label)
         self.add_action(next_button)
 
-        self.grid = QGridLayout()
-        self.grid.setSpacing(8)
-
-        self.content_layout.addLayout(self.grid)
-        self.content_layout.addStretch()
-
-        self._render(self.today.year, self.today.month)
+        self._render(self.year, self.month)
 
     # ------------------------------------------------------------------
     # Данные
@@ -72,7 +76,11 @@ class CalendarPage(BasePage):
 
     def reload(self):
         if self.demo or self.task_service is None:
-            self._render(self.today.year, self.today.month)
+            self._events = [
+                {**event, "month": self.today.month, "year": self.today.year}
+                for event in upcoming_events()
+            ]
+            self._render(self.year, self.month)
             return
 
         self.show_loading()
@@ -99,42 +107,65 @@ class CalendarPage(BasePage):
 
     def _set_events(self, events: list[dict]):
         self._events = events
-        self._render(self.today.year, self.today.month)
+        self._render(self.year, self.month)
+
+    # ------------------------------------------------------------------
+    # Навигация
+    # ------------------------------------------------------------------
+
+    def _shift_month(self, delta: int):
+        month = self.month + delta
+        year = self.year
+
+        if month < 1:
+            month = 12
+            year -= 1
+        elif month > 12:
+            month = 1
+            year += 1
+
+        self._render(year, month)
 
     # ------------------------------------------------------------------
     # Отрисовка
     # ------------------------------------------------------------------
 
     def _render(self, year: int, month: int):
-        while self.grid.count():
-            item = self.grid.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
+        self.clear_content()
 
         self.year = year
         self.month = month
-
         self.month_label.setText(f"{MONTHS[month - 1]} {year}")
+
+        grid = QGridLayout()
+        grid.setSpacing(8)
 
         for column, weekday in enumerate(WEEKDAYS):
             label = QLabel(weekday)
             label.setProperty("role", "muted")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.grid.addWidget(label, 0, column)
+            grid.addWidget(label, 0, column)
 
-        events = getattr(self, "_events", upcoming_events())
-        weeks = calendar.monthcalendar(year, month)
-
-        for row, week in enumerate(weeks, start=1):
+        for row, week in enumerate(calendar.monthcalendar(year, month), start=1):
             for column, day in enumerate(week):
                 if day == 0:
                     continue
 
-                cell = self._build_cell(day, events)
-                self.grid.addWidget(cell, row, column)
+                grid.addWidget(self._build_cell(day), row, column)
 
-    def _build_cell(self, day: int, events: list[dict]) -> QFrame:
+        self.content_layout.addLayout(grid)
+        self.content_layout.addStretch()
+
+    def _month_events(self, day: int) -> list[dict]:
+        return [
+            event
+            for event in self._events
+            if event.get("day") == day
+            and event.get("month", self.month) == self.month
+            and event.get("year", self.year) == self.year
+        ]
+
+    def _build_cell(self, day: int) -> QFrame:
         cell = QFrame()
         cell.setProperty("component", "calendar-cell")
         cell.setMinimumHeight(84)
@@ -155,21 +186,10 @@ class CalendarPage(BasePage):
 
         layout.addWidget(number)
 
-        day_events = [
-            event
-            for event in events
-            if event["day"] == day
-            and getattr(event, "month", 1) == self.month
-            and getattr(event, "year", 9999) == self.year
-        ]
-
-        if not day_events:
-            pass
-        else:
-            for event in day_events[:MAX_EVENTS]:
-                label = QLabel(event["title"])
-                label.setProperty("role", "muted")
-                layout.addWidget(label)
+        for event in self._month_events(day)[:MAX_EVENTS]:
+            label = QLabel(event["title"])
+            label.setProperty("role", "muted")
+            layout.addWidget(label)
 
         layout.addStretch()
 
