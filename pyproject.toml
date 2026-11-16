@@ -87,6 +87,8 @@ extend-immutable-calls = [
 [tool.ruff.lint.per-file-ignores]
 # UI-слой обрабатывает ошибки API на границе и держит ссылку на QApplication.
 "client/**" = ["BLE001", "F841"]
+# Ручные скрипты проверки: печатают любые ошибки и держат QApplication живым.
+"scripts/**" = ["BLE001", "F841"]
 
 [tool.mypy]
 python_version = "3.10"
