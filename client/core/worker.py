@@ -1,8 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal, Slot
-from PySide6.QtWidgets import QLabel
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal, Slot
 
 
 class ApiWorker(QRunnable):
@@ -34,6 +33,12 @@ class ApiWorker(QRunnable):
             self.signals.success.emit(result)
 
 
+# QThreadPool не держит Python-ссылок на QRunnable: без этого набора
+# объект мог быть собран сборщиком мусора прямо во время запроса,
+# а вместе с ним исчезал и объект signals.
+_ACTIVE_WORKERS: set[ApiWorker] = set()
+
+
 def run_async(
     fn: Callable[..., Any],
     on_success: Callable[[Any], None],
@@ -44,29 +49,19 @@ def run_async(
     """Запускает ``fn`` в пуле потоков и связывает колбэки."""
     worker = ApiWorker(fn, *args, **kwargs)
 
+    def _release(*_: Any) -> None:
+        _ACTIVE_WORKERS.discard(worker)
+
     worker.signals.success.connect(on_success)
 
     if on_error is not None:
         worker.signals.error.connect(on_error)
 
+    worker.signals.success.connect(_release)
+    worker.signals.error.connect(_release)
+
+    _ACTIVE_WORKERS.add(worker)
+
     QThreadPool.globalInstance().start(worker)
 
     return worker
-
-
-class LoadingWidget(QLabel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.setText("Загрузка...")
-        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.hide()
-
-    def start(self):
-        self.show()
-
-    def stop(self):
-        self.hide()
-
-
