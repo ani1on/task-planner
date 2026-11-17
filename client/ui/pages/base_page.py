@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -72,10 +72,10 @@ class BasePage(QWidget):
         header_layout.addStretch()
         header_layout.addLayout(self.actions_layout)
 
-        scroll = QScrollArea()
-        scroll.setObjectName("PageScroll")
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("PageScroll")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
 
         body = QWidget()
         body.setObjectName("PageBody")
@@ -84,10 +84,10 @@ class BasePage(QWidget):
         self.content_layout.setContentsMargins(28, 8, 28, 28)
         self.content_layout.setSpacing(16)
 
-        scroll.setWidget(body)
+        self.scroll_area.setWidget(body)
 
         root.addWidget(header)
-        root.addWidget(scroll, 1)
+        root.addWidget(self.scroll_area, 1)
 
     def add_action(self, widget):
         self.actions_layout.addWidget(widget)
@@ -102,12 +102,27 @@ class BasePage(QWidget):
     def reload(self):
         """Перезагружает данные страницы. Переопределяется наследниками."""
 
-    def set_demo(self, demo: bool):
-        self.demo = demo
-        self.reload()
-
     def clear_content(self):
         clear_layout(self.content_layout)
+
+    def scroll_to_widget(self, widget: QWidget):
+        self.scroll_area.ensureWidgetVisible(widget, 0, 24)
+        widget.setProperty("searchTarget", True)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
+
+        timer = QTimer(widget)
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: self._clear_search_target(widget))
+        timer.start(1800)
+
+    @staticmethod
+    def _clear_search_target(widget: QWidget):
+        widget.setProperty("searchTarget", False)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
 
     def show_loading(self, message: str = "Загрузка..."):
         self.clear_content()

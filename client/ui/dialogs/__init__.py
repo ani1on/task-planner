@@ -10,7 +10,6 @@ from .project_members import ProjectMembersPanel
 from .recurrence import RecurrenceDialog
 from .reminders import ReminderManagerPanel
 from .reset_password import ResetPasswordDialog
-from .search_results import SearchResultsDialog
 from .task import TaskDialog
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     "RecurrenceDialog",
     "ReminderManagerPanel",
     "ResetPasswordDialog",
-    "SearchResultsDialog",
     "TaskDialog",
 ]

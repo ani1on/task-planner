@@ -8,7 +8,8 @@ from fastapi.testclient import TestClient
 
 # Тесты должны работать без запущенного PostgreSQL, поэтому до импорта
 # приложения переключаем настройки на временную SQLite-базу.
-_TEST_DB_DIR = Path(tempfile.mkdtemp(prefix="task_planner_tests_"))
+_TEST_DB_TEMP = tempfile.TemporaryDirectory(prefix="task_planner_tests_")
+_TEST_DB_DIR = Path(_TEST_DB_TEMP.name)
 _TEST_DB_PATH = _TEST_DB_DIR / "test.db"
 
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH.as_posix()}"
@@ -28,14 +29,11 @@ def _database() -> None:
 
     yield
 
-    Base.metadata.drop_all(bind=engine)
-    engine.dispose()
-
     try:
-        _TEST_DB_PATH.unlink(missing_ok=True)
-        _TEST_DB_DIR.rmdir()
-    except OSError:
-        pass
+        Base.metadata.drop_all(bind=engine)
+    finally:
+        engine.dispose()
+        _TEST_DB_TEMP.cleanup()
 
 
 @pytest.fixture(autouse=True)
