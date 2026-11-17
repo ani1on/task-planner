@@ -354,6 +354,10 @@ QFrame[component="task"] {
     border-radius: 10px;
 }
 
+QFrame[searchTarget="true"] {
+    border: 2px solid palette(highlight);
+}
+
 QFrame[component="task"]:hover {
     border-color: #3f3f47;
 }
@@ -363,11 +367,65 @@ QFrame[component="task"][done="true"] QLabel[role="task-title"] {
 }
 
 QFrame[component="notification"] {
+    background-color: #1c1c20;
+    border: 1px solid #2f2f36;
     border-radius: 8px;
+}
+
+QFrame[component="notification"][unread="true"] {
+    border-left: 3px solid #60a5fa;
 }
 
 QFrame[component="notification"]:hover {
     background-color: #26262c;
+}
+
+QLabel[role="notification-title"] {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel[role="notification-time"] {
+    color: #9aa1ab;
+    font-size: 12px;
+}
+
+QLabel[role="notification-count"] {
+    background-color: #1e2a44;
+    color: #93c5fd;
+    border-radius: 10px;
+    padding: 4px 9px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+QLabel[role="notification-empty-title"] {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+QPushButton[notificationAction="true"] {
+    background-color: transparent;
+    color: #93c5fd;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+QPushButton[notificationAction="true"]:hover {
+    background-color: #1e2a44;
+}
+
+QPushButton[notificationAction="true"][danger="true"] {
+    color: #f87171;
+}
+
+QPushButton[notificationAction="true"][danger="true"]:hover {
+    background-color: #3a1a1a;
+}
+
+QScrollArea#NotificationScroll,
+QScrollArea#NotificationScroll #qt_scrollarea_viewport {
+    background: transparent;
 }
 
 QFrame#KanbanColumn {
@@ -386,6 +444,73 @@ QFrame[component="calendar-cell"] {
 QFrame[component="calendar-cell"][today="true"] {
     background-color: #1e2a44;
     border: 1px solid #3b82f6;
+}
+
+QFrame[component="calendar-cell"]:hover {
+    border-color: #3f3f47;
+}
+
+QLabel[role="calendar-event"] {
+    background-color: #1e2a44;
+    color: #93c5fd;
+    border-radius: 4px;
+    padding: 3px 5px;
+    font-size: 11px;
+}
+
+QPushButton[role="calendar-event"] {
+    background-color: #1e2a44;
+    color: #93c5fd;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 5px;
+    text-align: left;
+    font-size: 11px;
+}
+
+QPushButton[role="calendar-event"]:hover {
+    background-color: #263757;
+}
+
+QPushButton[role="calendar-event"][priority="low"] {
+    background-color: #303038;
+    color: #d1d5db;
+}
+
+QPushButton[role="calendar-event"][priority="low"]:hover {
+    background-color: #3b3b44;
+}
+
+QPushButton[role="calendar-event"][priority="high"] {
+    background-color: #4a3218;
+    color: #fbbf24;
+}
+
+QPushButton[role="calendar-event"][priority="high"]:hover {
+    background-color: #604321;
+}
+
+QPushButton[role="calendar-event"][priority="critical"] {
+    background-color: #4b2024;
+    color: #fca5a5;
+}
+
+QPushButton[role="calendar-event"][priority="critical"]:hover {
+    background-color: #62272d;
+}
+
+QPushButton#CalendarAddButton {
+    background-color: #2a2a31;
+    border: none;
+    border-radius: 14px;
+    color: #c7cbd1;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+}
+
+QPushButton#CalendarAddButton:hover {
+    background-color: #373740;
 }
 
 /* ===== Badges ===== */
