@@ -31,6 +31,13 @@ def create_task(
     return response.json()
 
 
+def parse_utc_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def auth_token(client: TestClient) -> str:
     header = client.headers["Authorization"]
 
@@ -277,6 +284,87 @@ def test_recurrence_requires_rule(auth_client: TestClient) -> None:
 
     assert response.status_code == 400
     assert response.json()["code"] == "recurrence_not_available"
+
+
+def test_weekly_recurrence_respects_interval_across_occurrences(
+    auth_client: TestClient,
+) -> None:
+    project = create_project(auth_client)
+    task = create_task(auth_client, project["id"])
+    start_at = datetime(2026, 1, 5, 9, tzinfo=timezone.utc)
+
+    created = auth_client.put(
+        f"/tasks/{task['id']}/recurrence",
+        json={
+            "frequency": "weekly",
+            "interval": 2,
+            "days_of_week": [1, 4],
+            "start_at": start_at.isoformat(),
+        },
+    )
+
+    assert created.status_code == 200, created.text
+    assert parse_utc_datetime(created.json()["next_run_at"]) == datetime(
+        2026, 1, 8, 9, tzinfo=timezone.utc
+    )
+
+    next_task = auth_client.post(f"/tasks/{task['id']}/next-occurrence")
+
+    assert next_task.status_code == 201, next_task.text
+    next_recurrence = auth_client.get(
+        f"/tasks/{next_task.json()['id']}/recurrence"
+    )
+    assert next_recurrence.status_code == 200
+    assert parse_utc_datetime(
+        next_recurrence.json()["next_run_at"]
+    ) == datetime(2026, 1, 19, 9, tzinfo=timezone.utc)
+
+
+def test_monthly_recurrence_keeps_day_and_calendar_due_date(
+    auth_client: TestClient,
+) -> None:
+    project = create_project(auth_client)
+    due_at = datetime(2026, 1, 31, 9, tzinfo=timezone.utc)
+    task = create_task(
+        auth_client,
+        project["id"],
+        due_at=due_at.isoformat(),
+    )
+
+    recurrence = auth_client.put(
+        f"/tasks/{task['id']}/recurrence",
+        json={
+            "frequency": "monthly",
+            "interval": 1,
+            "day_of_month": 31,
+            "start_at": due_at.isoformat(),
+        },
+    )
+
+    assert recurrence.status_code == 200, recurrence.text
+    assert parse_utc_datetime(
+        recurrence.json()["next_run_at"]
+    ) == datetime(2026, 2, 28, 9, tzinfo=timezone.utc)
+
+    completed = auth_client.patch(
+        f"/tasks/{task['id']}",
+        json={"status": "done"},
+    )
+    assert completed.status_code == 200, completed.text
+
+    tasks = auth_client.get("/tasks").json()
+    next_task = next(item for item in tasks if item["id"] != task["id"])
+    assert parse_utc_datetime(next_task["due_at"]) == datetime(
+        2026, 2, 28, 9, tzinfo=timezone.utc
+    )
+
+    next_recurrence = auth_client.get(
+        f"/tasks/{next_task['id']}/recurrence"
+    )
+    assert next_recurrence.status_code == 200
+    assert parse_utc_datetime(
+        next_recurrence.json()["next_run_at"]
+    ) == datetime(2026, 3, 31, 9, tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------

@@ -12,19 +12,6 @@ from ..repositories.task_recurrence import TaskRecurrenceRepository
 from ..schemas.recurrence import RecurrenceCreate, RecurrenceUpdate
 
 
-def _add_months(
-    value: datetime,
-    months: int,
-) -> datetime:
-    month_index = value.month - 1 + months
-    year = value.year + month_index // 12
-    month = month_index % 12 + 1
-
-    day = min(value.day, calendar.monthrange(year, month)[1])
-
-    return value.replace(year=year, month=month, day=day)
-
-
 class RecurrenceService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -128,18 +115,35 @@ class RecurrenceService:
             days = recurrence.days_of_week or []
 
             if days:
-                candidate = after
+                anchor = ensure_utc(recurrence.start_at)
+                anchor_week = (
+                    anchor.date() - timedelta(days=anchor.isoweekday() - 1)
+                )
 
-                for _ in range(7 * interval + 1):
-                    candidate += timedelta(days=1)
+                for day_offset in range(1, 7 * interval + 8):
+                    candidate = after + timedelta(days=day_offset)
+                    candidate_week = (
+                        candidate.date()
+                        - timedelta(days=candidate.isoweekday() - 1)
+                    )
+                    week_offset = (candidate_week - anchor_week).days // 7
 
-                    if candidate.isoweekday() in days:
+                    if (
+                        week_offset >= 0
+                        and week_offset % interval == 0
+                        and candidate.isoweekday() in days
+                    ):
                         return candidate
 
             return after + timedelta(weeks=interval)
 
         if recurrence.frequency == "monthly":
-            return _add_months(after, interval)
+            month_index = after.month - 1 + interval
+            year = after.year + month_index // 12
+            month = month_index % 12 + 1
+            day = recurrence.day_of_month or recurrence.start_at.day
+            day = min(day, calendar.monthrange(year, month)[1])
+            return after.replace(year=year, month=month, day=day)
 
         return after + timedelta(days=interval)
 
@@ -167,9 +171,10 @@ class RecurrenceService:
             return None
 
         offset = None
-
         if task.start_at is not None and task.due_at is not None:
             offset = ensure_utc(task.due_at) - ensure_utc(task.start_at)
+        elif task.due_at is not None:
+            offset = ensure_utc(task.due_at) - ensure_utc(recurrence.start_at)
 
         next_task = Task(
             project_id=task.project_id,
@@ -180,7 +185,7 @@ class RecurrenceService:
             status="todo",
             priority=task.priority,
             position=task.position,
-            start_at=next_start,
+            start_at=recurrence.start_at,
             due_at=next_start + offset if offset is not None else None,
         )
 
