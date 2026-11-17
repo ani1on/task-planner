@@ -1,3 +1,4 @@
+from .activity_page import ActivityPage
 from .base_page import BasePage
 from .calendar_page import CalendarPage
 from .dashboard_page import DashboardPage
@@ -10,6 +11,7 @@ from .settings_page import SettingsPage
 from .tasks_page import TasksPage
 
 __all__ = [
+    "ActivityPage",
     "BasePage",
     "CalendarPage",
     "DashboardPage",

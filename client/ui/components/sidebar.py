@@ -19,6 +19,7 @@ NAV_ITEMS = [
     ("kanban", "Канбан", "columns"),
     ("projects", "Проекты", "folder"),
     ("calendar", "Календарь", "calendar"),
+    ("activity", "Активность", "clock"),
     ("notes", "Заметки", "note"),
     ("settings", "Настройки", "sliders"),
 ]
