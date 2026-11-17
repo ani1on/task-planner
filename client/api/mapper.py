@@ -1,18 +1,22 @@
-"""Преобразование ответов API в модели и словари для UI.
-
-Страницы работают с view-словарями той же структуры, что и
-``client/ui/mock_data.py``, поэтому карточки не зависят от источника данных.
-"""
+"""Преобразование ответов API в модели и словари для UI."""
 
 from datetime import datetime, timezone
 from typing import Any
 
 from .models import (
+    Activity,
+    Checklist,
+    ChecklistItem,
+    Comment,
     Dashboard,
     DashboardStats,
+    Event,
     Member,
     Note,
+    Notification,
     Project,
+    Recurrence,
+    Reminder,
     Tag,
     Task,
     User,
@@ -254,6 +258,111 @@ def note_from_dict(data: dict[str, Any]) -> Note:
     )
 
 
+def comment_from_dict(data: dict[str, Any]) -> Comment:
+    return Comment(
+        id=_get(data, "id", 0),
+        task_id=_get(data, "task_id", 0),
+        author_id=_get(data, "author_id", 0),
+        content=_get(data, "content", ""),
+        created_at=parse_datetime(_get(data, "created_at")),
+        updated_at=parse_datetime(_get(data, "updated_at")),
+    )
+
+
+def checklist_item_from_dict(data: dict[str, Any]) -> ChecklistItem:
+    return ChecklistItem(
+        id=_get(data, "id", 0),
+        checklist_id=_get(data, "checklist_id", 0),
+        content=_get(data, "content", ""),
+        is_completed=bool(_get(data, "is_completed", False)),
+        position=_get(data, "position", 0) or 0,
+    )
+
+
+def checklist_from_dict(data: dict[str, Any]) -> Checklist:
+    return Checklist(
+        id=_get(data, "id", 0),
+        task_id=_get(data, "task_id", 0),
+        title=_get(data, "title", ""),
+        position=_get(data, "position", 0) or 0,
+        items=tuple(
+            checklist_item_from_dict(item)
+            for item in _get(data, "items", []) or []
+        ),
+    )
+
+
+def notification_from_dict(data: dict[str, Any]) -> Notification:
+    return Notification(
+        id=_get(data, "id", 0),
+        title=_get(data, "title", ""),
+        text=_get(data, "text", "") or _get(data, "message", "") or "",
+        is_read=bool(_get(data, "is_read", False)),
+        created_at=parse_datetime(_get(data, "created_at")),
+    )
+
+
+def event_from_dict(data: dict[str, Any]) -> Event:
+    return Event(
+        id=_get(data, "id", 0),
+        title=_get(data, "title", ""),
+        start_at=parse_datetime(_get(data, "start_at")),
+        end_at=parse_datetime(_get(data, "end_at")),
+        description=_get(data, "description"),
+        project_id=_get(data, "project_id"),
+        task_id=_get(data, "task_id"),
+        all_day=bool(_get(data, "all_day", False)),
+        location=_get(data, "location"),
+        created_at=parse_datetime(_get(data, "created_at")),
+        updated_at=parse_datetime(_get(data, "updated_at")),
+    )
+
+
+def reminder_from_dict(data: dict[str, Any]) -> Reminder:
+    return Reminder(
+        id=_get(data, "id", 0),
+        remind_at=parse_datetime(_get(data, "remind_at")),
+        channel=_get(data, "channel", "desktop"),
+        status=_get(data, "status", "pending"),
+        task_id=_get(data, "task_id"),
+        event_id=_get(data, "event_id"),
+        sent_at=parse_datetime(_get(data, "sent_at")),
+        created_at=parse_datetime(_get(data, "created_at")),
+        updated_at=parse_datetime(_get(data, "updated_at")),
+    )
+
+
+def recurrence_from_dict(data: dict[str, Any]) -> Recurrence:
+    days = _get(data, "days_of_week")
+    return Recurrence(
+        id=_get(data, "id", 0),
+        task_id=_get(data, "task_id", 0),
+        frequency=_get(data, "frequency", "weekly"),
+        interval=_get(data, "interval", 1),
+        start_at=parse_datetime(_get(data, "start_at")),
+        is_active=bool(_get(data, "is_active", True)),
+        days_of_week=tuple(days) if days is not None else None,
+        day_of_month=_get(data, "day_of_month"),
+        end_at=parse_datetime(_get(data, "end_at")),
+        next_run_at=parse_datetime(_get(data, "next_run_at")),
+    )
+
+
+def activity_from_dict(data: dict[str, Any]) -> Activity:
+    return Activity(
+        id=_get(data, "id", 0),
+        action=_get(data, "action", ""),
+        entity_type=_get(data, "entity_type", ""),
+        entity_id=_get(data, "entity_id", 0),
+        user_id=_get(data, "user_id"),
+        project_id=_get(data, "project_id"),
+        task_id=_get(data, "task_id"),
+        old_values=_get(data, "old_values"),
+        new_values=_get(data, "new_values"),
+        created_at=parse_datetime(_get(data, "created_at")),
+    )
+
+
 def stats_from_dict(data: dict[str, Any]) -> DashboardStats:
     return DashboardStats(
         total=_get(data, "total", 0) or 0,
@@ -297,12 +406,15 @@ def task_view(task: Task, project_names: ProjectNames = None) -> dict[str, Any]:
     return {
         "id": task.id,
         "title": task.title,
+        "description": task.description,
+        "project_id": task.project_id,
         "project": names.get(task.project_id),
         "status": task.status,
         "priority": task.priority,
         "due": format_due(task.due_at),
         "due_at": task.due_at,
         "tags": [tag.name for tag in task.tags],
+        "tag_colors": {tag.name: tag.color for tag in task.tags},
         "done": task.is_done,
     }
 
@@ -345,5 +457,3 @@ def dashboard_stats_view(stats: DashboardStats) -> list[dict[str, str]]:
         {"label": "Выполнено", "value": str(stats.done), "accent": "success"},
         {"label": "Просрочено", "value": str(stats.overdue), "accent": "danger"},
     ]
-
-

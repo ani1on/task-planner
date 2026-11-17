@@ -1,8 +1,8 @@
 from typing import Any
 
 from client.api.client import ApiClient
-from client.api.mapper import task_from_dict
-from client.api.models import Task
+from client.api.mapper import recurrence_from_dict, task_from_dict
+from client.api.models import Recurrence, Task
 
 
 class TaskService:
@@ -93,8 +93,45 @@ class TaskService:
 
         return [task_from_dict(item) for item in response]
 
+    def create_subtask(self, task_id: int, title: str) -> Task:
+        response = self.api.post(
+            f"/tasks/{task_id}/subtasks",
+            json={"title": title},
+        )
+
+        return task_from_dict(response)
+
     def subtask_progress(self, task_id: int) -> dict[str, int]:
         return self.api.get(f"/tasks/{task_id}/subtasks/progress") or {
             "total": 0,
             "completed": 0,
         }
+
+    def recurrence(self, task_id: int) -> Recurrence:
+        response = self.api.get(f"/tasks/{task_id}/recurrence")
+
+        return recurrence_from_dict(response)
+
+    def set_recurrence(self, task_id: int, **fields: Any) -> Recurrence:
+        response = self.api.put(
+            f"/tasks/{task_id}/recurrence",
+            json=fields,
+        )
+
+        return recurrence_from_dict(response)
+
+    def update_recurrence(self, task_id: int, **fields: Any) -> Recurrence:
+        response = self.api.patch(
+            f"/tasks/{task_id}/recurrence",
+            json=fields,
+        )
+
+        return recurrence_from_dict(response)
+
+    def delete_recurrence(self, task_id: int) -> None:
+        self.api.delete(f"/tasks/{task_id}/recurrence")
+
+    def create_next_occurrence(self, task_id: int) -> Task:
+        response = self.api.post(f"/tasks/{task_id}/next-occurrence")
+
+        return task_from_dict(response)
