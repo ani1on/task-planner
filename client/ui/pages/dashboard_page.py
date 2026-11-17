@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (
+﻿from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -15,10 +15,9 @@ from client.api.models import Dashboard, Task
 from client.core.constants import PROJECT_COLORS
 from client.core.worker import run_async
 from client.services.dashboard import DashboardService
-from client.services.projects import ProjectService
+from client.services.tasks import TaskService
 from client.ui.components import (
     EmptyState,
-    PrimaryButton,
     ProgressBar,
     SectionTitle,
     StatCard,
@@ -26,11 +25,6 @@ from client.ui.components import (
 )
 from client.ui.crud_actions import TaskActionsMixin
 from client.ui.error_handler import error_message
-from client.ui.mock_data import (
-    dashboard_stats,
-    projects,
-    tasks,
-)
 
 from .base_page import BasePage
 
@@ -77,36 +71,49 @@ class ProjectProgressRow(QFrame):
 
 
 class DashboardPage(TaskActionsMixin, BasePage):
-    def __init__(self, api: ApiClient | None = None, demo: bool = False, parent=None):
+    def __init__(
+        self,
+        api: ApiClient,
+        user_id: int | None = None,
+        parent=None,
+    ):
         super().__init__("Дашборд", "Обзор задач, проектов и активности")
 
         self.api = api
-        self.demo = demo
-        self.dashboard_service = DashboardService(api) if api else None
-        self.project_service = ProjectService(api) if api else None
+        self.user_id = user_id
+        self.dashboard_service = DashboardService(api)
+        self.task_service = TaskService(api)
 
         self._task_models: dict[int, Task] = {}
-
-        create_button = PrimaryButton("Новая задача", "plus")
-        create_button.clicked.connect(lambda: self.open_task_dialog())
-        self.add_action(create_button)
+        self._task_cards: dict[int, TaskCard] = {}
+        self._subtask_parent_ids: set[int] = set()
 
     # ------------------------------------------------------------------
     # Данные
     # ------------------------------------------------------------------
 
     def reload(self):
-        if self.demo or self.dashboard_service is None:
-            self._render_demo()
-            return
-
         self.show_loading()
 
         run_async(
-            self.dashboard_service.get,
-            self._render,
+            self._load_dashboard,
+            self._render_loaded,
             self._show_error,
         )
+
+    def _load_dashboard(self) -> tuple[Dashboard, set[int]]:
+        dashboard = self.dashboard_service.get()
+        tasks = self.task_service.list()
+        parent_ids = {
+            task.parent_task_id
+            for task in tasks
+            if task.parent_task_id is not None
+        }
+        return dashboard, parent_ids
+
+    def _render_loaded(self, data: tuple[Dashboard, set[int]]):
+        dashboard, self._subtask_parent_ids = data
+        self._render(dashboard)
 
     def _show_error(self, error: Exception):
         self.show_error(error_message(error), self.reload)
@@ -117,29 +124,15 @@ class DashboardPage(TaskActionsMixin, BasePage):
 
     def _render(self, dashboard: Dashboard):
         self._task_models = {
-            task.id: task for task in dashboard.upcoming_tasks
+            task.id: task
+            for task in dashboard.upcoming_tasks
+            if task.parent_task_id is None
         }
 
         self.clear_content()
 
         self._build_stats(dashboard_stats_view(dashboard.stats))
         self._build_columns(dashboard)
-
-    def _render_demo(self):
-        self._task_models = {}
-
-        self.clear_content()
-
-        self._build_stats(dashboard_stats())
-
-        layout = QHBoxLayout()
-        layout.setSpacing(16)
-
-        layout.addLayout(self._build_today(tasks()[:3]), 1)
-        layout.addLayout(self._build_project_rows(projects()[:3]), 1)
-
-        self.content_layout.addLayout(layout)
-        self.content_layout.addStretch()
 
     def _build_stats(self, stats: list[dict]):
         layout = QHBoxLayout()
@@ -166,8 +159,15 @@ class DashboardPage(TaskActionsMixin, BasePage):
         }
 
         today_tasks = [
-            task_view(task, project_names)
-            for task in dashboard.upcoming_tasks[:3]
+            {
+                **task_view(task, project_names),
+                "has_subtasks": task.id in self._subtask_parent_ids,
+            }
+            for task in [
+                task
+                for task in dashboard.upcoming_tasks
+                if task.parent_task_id is None
+            ][:3]
         ]
 
         project_rows = [
@@ -183,6 +183,7 @@ class DashboardPage(TaskActionsMixin, BasePage):
     def _build_today(self, tasks: list[dict]) -> QVBoxLayout:
         layout = QVBoxLayout()
         layout.setSpacing(12)
+        self._task_cards = {}
 
         layout.addWidget(SectionTitle("Задачи на сегодня"))
 
@@ -191,11 +192,11 @@ class DashboardPage(TaskActionsMixin, BasePage):
         else:
             for task in tasks:
                 card = TaskCard(task)
+                self._task_cards[int(task["id"])] = card
 
-                card.activated.connect(self.edit_task)
-                card.edit_requested.connect(self.edit_task)
                 card.completion_changed.connect(self.toggle_task)
-                card.delete_requested.connect(self.delete_task)
+                card.set_panel_enabled(True)
+                card.set_editing_enabled(False)
 
                 layout.addWidget(card)
 
