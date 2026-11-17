@@ -44,7 +44,8 @@ Task Planner — это комплексная система управлени
 - **Комментарии**: обсуждение задач в команде
 - **Заметки**: хранение информации по проектам
 - **Канбан-доска**: визуальное управление задачами с Drag & Drop
-- **Календарь**: просмотр задач и дедлайнов
+- **Календарь**: просмотр задач, дедлайнов и событий; создание и редактирование событий
+- **Активность**: история действий с фильтром по проекту и постраничной загрузкой
 
 ### Уведомления и напоминания
 - Внутренние уведомления в приложении
@@ -135,7 +136,7 @@ Task Planner — это комплексная система управлени
 | Notes | `GET/POST /notes`, `GET/PATCH/DELETE /notes/{id}` |
 | Events | `GET/POST /events`, `GET/PATCH/DELETE /events/{id}` |
 | Reminders | `GET/POST /reminders`, `GET/PATCH/DELETE /reminders/{id}`, `POST /reminders/process-due` |
-| Notifications | `GET /notifications`, `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/read-all` |
+| Notifications | `GET/POST /notifications`, `GET /notifications/unread-count`, `POST /notifications/{id}/read`, `POST /notifications/read-all`, `DELETE /notifications/{id}` |
 | Activity | `GET /activity?project_id=&task_id=` |
 | Dashboard | `GET /dashboard` |
 | Search | `GET /search?q=` |
@@ -166,8 +167,9 @@ Task Planner — это комплексная система управлени
 
 ### Напоминания
 
-Напоминания можно обрабатывать вручную (`POST /reminders/process-due`) или
-фоновым воркером: `REMINDERS_WORKER_ENABLED=True` в `.env`.
+Напоминания в клиенте можно создавать и редактировать для задач и событий.
+Их обработка выполняется фоновым воркером: `REMINDERS_WORKER_ENABLED=True`
+в `.env`. Служебный `POST /reminders/process-due` не вызывается клиентом.
 
 ### Защита dev-маршрутов
 
