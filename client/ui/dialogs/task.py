@@ -1,11 +1,13 @@
 from datetime import datetime
 
-from PySide6.QtCore import QDate, QDateTime, QTime
+from PySide6.QtCore import QDateTime, QLocale, Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDateTimeEdit,
     QHBoxLayout,
     QPlainTextEdit,
+    QWidget,
 )
 
 from client.api.models import Member, Project, Task
@@ -24,15 +26,9 @@ from client.ui.components import (
 
 from .base import BaseDialog
 
-# Минимальная дата означает «значение не задано» (см. setSpecialValueText).
-MIN_DATETIME = QDateTime(QDate(2000, 1, 1), QTime(0, 0))
 
-
-def to_iso(value: QDateTime) -> str | None:
-    """Преобразует значение виджета в ISO-строку или None."""
-    if value == MIN_DATETIME:
-        return None
-
+def to_iso(value: QDateTime) -> str:
+    """Преобразует выбранную дату в ISO-строку."""
     moment = value.toPython()
 
     if moment.tzinfo is None:
@@ -43,7 +39,7 @@ def to_iso(value: QDateTime) -> str | None:
 
 def to_widget_datetime(moment: datetime | None) -> QDateTime:
     if moment is None:
-        return MIN_DATETIME
+        return QDateTime.currentDateTime()
 
     return QDateTime(moment)
 
@@ -57,6 +53,8 @@ class TaskDialog(BaseDialog):
         members_map: dict[int, list[Member]] | None = None,
         task: Task | None = None,
         project_id: int | None = None,
+        due_at: datetime | None = None,
+        require_due_date: bool = False,
         parent=None,
     ):
         super().__init__(parent)
@@ -64,17 +62,18 @@ class TaskDialog(BaseDialog):
         self.task = task
         self.projects = list(projects)
         self.members_map = members_map or {}
+        self.require_due_date = require_due_date
 
         self.setWindowTitle(
             "Новая задача" if task is None else "Редактирование задачи"
         )
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(600)
 
         self.layout.setContentsMargins(24, 22, 24, 20)
         self.layout.setSpacing(14)
 
         self._build_fields()
-        self._fill(task, project_id)
+        self._fill(task, project_id, due_at)
 
     # ------------------------------------------------------------------
     # Построение формы
@@ -104,11 +103,28 @@ class TaskDialog(BaseDialog):
         self.status_field = FormField("Статус", self.status_combo)
         self.priority_field = FormField("Приоритет", self.priority_combo)
 
-        self.start_edit = self._make_datetime_edit()
-        self.due_edit = self._make_datetime_edit()
-
-        self.start_field = FormField("Начало", self.start_edit)
-        self.due_field = FormField("Дедлайн", self.due_edit)
+        (
+            self.start_field,
+            self.start_check,
+            self.start_edit,
+        ) = self._make_optional_datetime_field("Начало")
+        (
+            self.due_field,
+            self.due_check,
+            self.due_edit,
+        ) = self._make_optional_datetime_field("Дедлайн")
+        self.start_edit.dateTimeChanged.connect(
+            lambda *_: self._clear_date_validation_errors()
+        )
+        self.due_edit.dateTimeChanged.connect(
+            lambda *_: self._clear_date_validation_errors()
+        )
+        self.start_check.toggled.connect(
+            lambda *_: self._clear_date_validation_errors()
+        )
+        self.due_check.toggled.connect(
+            lambda *_: self._clear_date_validation_errors()
+        )
 
         self.description_edit = QPlainTextEdit()
         self.description_edit.setPlaceholderText(
@@ -152,29 +168,72 @@ class TaskDialog(BaseDialog):
 
         return row
 
+    @classmethod
+    def _make_optional_datetime_field(
+        cls,
+        label: str,
+    ) -> tuple[FormField, QCheckBox, QDateTimeEdit]:
+        container = QWidget()
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(8)
+
+        check = QCheckBox("Указать")
+        edit = cls._make_datetime_edit()
+        edit.setEnabled(False)
+        check.toggled.connect(edit.setEnabled)
+
+        row.addWidget(check)
+        row.addWidget(edit, 1)
+
+        field = FormField(label, container)
+
+        return field, check, edit
+
     @staticmethod
     def _make_datetime_edit() -> QDateTimeEdit:
         edit = QDateTimeEdit()
         edit.setCalendarPopup(True)
         edit.setDisplayFormat("dd.MM.yyyy HH:mm")
-        edit.setMinimumDateTime(MIN_DATETIME)
-        edit.setDateTime(MIN_DATETIME)
-        edit.setSpecialValueText("Не задано")
-        edit.setMinimumWidth(170)
+        edit.setLocale(QLocale("ru_RU"))
+        edit.calendarWidget().setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+        edit.setDateTime(QDateTime.currentDateTime())
+        edit.setMinimumWidth(140)
 
         return edit
+
+    @staticmethod
+    def _clear_date_error(field: FormField, edit: QDateTimeEdit):
+        field.clear_error()
+        edit.setProperty("invalid", "false")
+        edit.style().unpolish(edit)
+        edit.style().polish(edit)
+
+    def _clear_date_validation_errors(self):
+        self._clear_date_error(self.start_field, self.start_edit)
+        self._clear_date_error(self.due_field, self.due_edit)
 
     # ------------------------------------------------------------------
     # Заполнение значениями
     # ------------------------------------------------------------------
 
-    def _fill(self, task: Task | None, project_id: int | None):
+    def _fill(
+        self,
+        task: Task | None,
+        project_id: int | None,
+        due_at: datetime | None,
+    ):
         if not self.projects:
             self.project_combo.addItem("Сначала создайте проект", None)
             self.project_combo.setEnabled(False)
         else:
             for project in self.projects:
                 self.project_combo.addItem(project.name, project.id)
+
+        start_at = task.start_at if task is not None else None
+        initial_due_at = task.due_at if task is not None else due_at
+        self._set_datetime(self.start_check, self.start_edit, start_at)
+        self._set_datetime(self.due_check, self.due_edit, initial_due_at)
 
         if task is None:
             self._select_data(self.project_combo, project_id)
@@ -191,11 +250,18 @@ class TaskDialog(BaseDialog):
         self._select_data(self.status_combo, task.status)
         self._select_data(self.priority_combo, task.priority)
 
-        self.start_edit.setDateTime(to_widget_datetime(task.start_at))
-        self.due_edit.setDateTime(to_widget_datetime(task.due_at))
-
         self._rebuild_assignees()
         self._select_data(self.assignee_combo, task.assignee_id)
+
+    @staticmethod
+    def _set_datetime(
+        check: QCheckBox,
+        edit: QDateTimeEdit,
+        value: datetime | None,
+    ):
+        check.setChecked(value is not None)
+        edit.setDateTime(to_widget_datetime(value))
+        edit.setEnabled(value is not None)
 
     def _on_project_changed(self, _index: int):
         self._rebuild_assignees()
@@ -232,14 +298,29 @@ class TaskDialog(BaseDialog):
             self.project_field.set_error("Сначала создайте проект")
             return
 
+        if self.require_due_date and not self.due_check.isChecked():
+            self.due_field.set_error("Для задачи календаря укажите дедлайн")
+            return
+
         start = self.start_edit.dateTime()
         due = self.due_edit.dateTime()
 
-        if start != MIN_DATETIME and due != MIN_DATETIME and due < start:
+        if (
+            self.start_check.isChecked()
+            and self.due_check.isChecked()
+            and due < start
+        ):
+            self._set_date_invalid(self.due_edit)
             self.due_field.set_error("Дедлайн раньше даты начала")
             return
 
         super().accept()
+
+    @staticmethod
+    def _set_date_invalid(edit: QDateTimeEdit):
+        edit.setProperty("invalid", "true")
+        edit.style().unpolish(edit)
+        edit.style().polish(edit)
 
     def payload(self) -> dict:
         data = {
@@ -248,8 +329,16 @@ class TaskDialog(BaseDialog):
             "status": self.status_combo.currentData(),
             "priority": self.priority_combo.currentData(),
             "assignee_id": self.assignee_combo.currentData(),
-            "start_at": to_iso(self.start_edit.dateTime()),
-            "due_at": to_iso(self.due_edit.dateTime()),
+            "start_at": (
+                to_iso(self.start_edit.dateTime())
+                if self.start_check.isChecked()
+                else None
+            ),
+            "due_at": (
+                to_iso(self.due_edit.dateTime())
+                if self.due_check.isChecked()
+                else None
+            ),
         }
 
         if self.task is None:
