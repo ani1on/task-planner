@@ -80,7 +80,7 @@ class FormField(QWidget):
         self._set_invalid(True)
 
     def clear_error(self):
-        if not self.error.isVisible():
+        if self.error.isHidden():
             return
 
         self.error.clear()

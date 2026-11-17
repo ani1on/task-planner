@@ -7,7 +7,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from client.core.worker import run_async
 from client.services.auth import AuthService
+from client.services.health import HealthService
 from client.ui.components import (
     Avatar,
     DangerButton,
@@ -33,11 +35,15 @@ class SettingsPage(BasePage):
         super().__init__("Настройки", "Профиль, внешний вид и уведомления")
 
         self.auth_service = auth_service
+        self.health_service = (
+            HealthService(auth_service.api) if auth_service is not None else None
+        )
 
         self._build_profile(user)
         self._build_appearance()
         self._build_notifications()
         self._build_account()
+        self._build_connection_status()
 
     def _section(self, title: str) -> QVBoxLayout:
         card = QFrame()
@@ -219,3 +225,44 @@ class SettingsPage(BasePage):
             return
 
         ErrorDialog("Пароль успешно изменён.", self).exec()
+
+    def _build_connection_status(self):
+        layout = self._section("Состояние сервера")
+        row = QHBoxLayout()
+        self.health_status = QLabel("Проверка ещё не выполнялась")
+        self.health_status.setProperty("role", "muted")
+        self.health_button = SecondaryButton("Проверить API и базу")
+        self.health_button.clicked.connect(self.check_connection)
+        row.addWidget(self.health_status, 1)
+        row.addWidget(self.health_button)
+        layout.addLayout(row)
+
+    def check_connection(self):
+        if self.health_service is None:
+            self.health_status.setText("Клиент API не настроен")
+            return
+        self.health_button.setEnabled(False)
+        self.health_status.setText("Проверка…")
+        run_async(
+            self._check_health,
+            self._show_health_status,
+            self._show_health_error,
+        )
+
+    def _check_health(self) -> tuple[dict, dict]:
+        return (
+            self.health_service.status(),
+            self.health_service.database_status(),
+        )
+
+    def _show_health_status(self, statuses: tuple[dict, dict]):
+        api_status, db_status = statuses
+        self.health_status.setText(
+            f"API: {api_status.get('status', 'неизвестно')} · "
+            f"База: {db_status.get('database', 'неизвестно')}"
+        )
+        self.health_button.setEnabled(True)
+
+    def _show_health_error(self, error: Exception):
+        self.health_status.setText(f"Ошибка проверки: {error}")
+        self.health_button.setEnabled(True)

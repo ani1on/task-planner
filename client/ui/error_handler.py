@@ -7,11 +7,14 @@ from client.api.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from client.ui.dialogs import ErrorDialog
+from client.core.session_store import SessionStoreError
 
 
 def error_message(error: Exception) -> str:
     """Возвращает понятный пользователю текст ошибки API."""
+
+    if isinstance(error, SessionStoreError):
+        return str(error)
 
     if isinstance(
         error,
@@ -62,6 +65,8 @@ def handle_api_error(
     error: Exception,
     parent=None,
 ):
+    from client.ui.dialogs import ErrorDialog
+
     dialog = ErrorDialog(
         error_message(error),
         parent,

@@ -76,9 +76,15 @@ class RegisterPage(QWidget):
             self.confirm_field,
         )
 
-        for field in self.fields:
+        for index, field in enumerate(self.fields[:-1]):
             card.body.addWidget(field)
-            field.field.returnPressed.connect(self.register)
+            field.field.returnPressed.connect(
+                lambda next_index=index + 1: self.fields[
+                    next_index
+                ].field.setFocus()
+            )
+        card.body.addWidget(self.fields[-1])
+        self.fields[-1].field.returnPressed.connect(self.register)
 
         self.terms = QCheckBox("Я принимаю условия использования")
         card.body.addWidget(self.terms)
@@ -142,6 +148,9 @@ class RegisterPage(QWidget):
 
     def _validate(self) -> bool:
         valid = True
+
+        for field in self.fields:
+            field.clear_error()
 
         email = self.email_field.value().strip()
         name = self.name_field.value().strip()

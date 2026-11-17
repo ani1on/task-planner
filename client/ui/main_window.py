@@ -1,17 +1,17 @@
 import contextlib
 
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QStackedWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QHBoxLayout, QStackedWidget, QVBoxLayout, QWidget
 
 from client.api.client import ApiClient
+from client.core.realtime import RealtimeClient
 from client.services.auth import AuthService
+from client.services.notifications import NotificationService
 from client.themes import ThemeManager
 from client.ui.components import Header, Sidebar
+from client.ui.dialogs.notifications import NotificationsPanel
+from client.ui.error_handler import error_message
 from client.ui.pages import (
+    ActivityPage,
     CalendarPage,
     DashboardPage,
     KanbanPage,
@@ -31,7 +31,6 @@ class MainWindow(QWidget):
         auth_service: AuthService,
         theme_manager: ThemeManager,
         on_logout=None,
-        demo: bool = False,
         parent=None,
     ):
         super().__init__(parent)
@@ -40,7 +39,7 @@ class MainWindow(QWidget):
         self.auth_service = auth_service
         self.theme_manager = theme_manager
         self.on_logout = on_logout
-        self.demo = demo
+        self.realtime = None
 
         self.setObjectName("MainWindow")
 
@@ -66,19 +65,23 @@ class MainWindow(QWidget):
         right.setSpacing(0)
 
         self.header = Header(user)
+        self.header.notifications_requested.connect(self.open_notifications)
+        self.header.profile_requested.connect(lambda: self.navigate_to("settings"))
+        self.header.logout_requested.connect(self.logout)
 
         self.stack = QStackedWidget()
+        self.notifications_panel = NotificationsPanel(self.api, self)
+        self.notifications_panel.changed.connect(self.refresh_notifications)
 
-        # В demo-режиме api=None — страницы берут данные из mock_data.
-        page_api = None if self.demo else self.api
-
+        user_id = (self.auth_service.user or {}).get("id")
         self.pages = {
-            "dashboard": DashboardPage(api=page_api, demo=self.demo),
-            "tasks": TasksPage(api=page_api, demo=self.demo),
-            "kanban": KanbanPage(api=page_api, demo=self.demo),
-            "projects": ProjectsPage(api=page_api, demo=self.demo),
-            "calendar": CalendarPage(api=page_api, demo=self.demo),
-            "notes": NotesPage(api=page_api, demo=self.demo),
+            "dashboard": DashboardPage(api=self.api, user_id=user_id),
+            "tasks": TasksPage(api=self.api, user_id=user_id),
+            "kanban": KanbanPage(api=self.api, user_id=user_id),
+            "projects": ProjectsPage(api=self.api, user_id=user_id),
+            "calendar": CalendarPage(api=self.api),
+            "activity": ActivityPage(api=self.api),
+            "notes": NotesPage(api=self.api),
             "settings": SettingsPage(user, self.auth_service),
         }
 
@@ -90,11 +93,49 @@ class MainWindow(QWidget):
             self.stack.addWidget(page)
 
         right.addWidget(self.header)
+        right.addWidget(self.notifications_panel)
+        self.notifications_panel.hide()
         right.addWidget(self.stack, 1)
 
         root.addLayout(right, 1)
 
         self.navigate_to("dashboard")
+
+    # ==================================================================
+    # Уведомления
+    # ==================================================================
+
+    def open_notifications(self):
+        self.notifications_panel.setVisible(self.notifications_panel.isHidden())
+        if self.notifications_panel.isVisible():
+            self.notifications_panel.reload()
+
+    # ==================================================================
+    # Вспомогательные методы
+    # ==================================================================
+
+    def refresh_notifications(self):
+        try:
+            count = NotificationService(self.api).unread_count()
+        except Exception as error:
+            self.header.unread_badge.setToolTip(
+                f"Не удалось загрузить уведомления: {error_message(error)}"
+            )
+            return
+
+        self.header.set_unread_count(count)
+        self.header.unread_badge.setToolTip("")
+        if self.notifications_panel.isVisible():
+            self.notifications_panel.reload()
+
+    def on_realtime_event(self, event: dict):
+        event_type = event.get("type") or event.get("event") or event.get("action")
+        if event_type == "notification_created":
+            self.refresh_notifications()
+        # Инвалидация текущей страницы по событиям задач.
+        page = self.stack.currentWidget()
+        if hasattr(page, "reload"):
+            page.reload()
 
     def navigate_to(self, key: str):
         page = self.pages.get(key)
@@ -116,6 +157,24 @@ class MainWindow(QWidget):
         self.header.set_user(user)
         self.pages["settings"].set_user(user)
 
+        user_id = (user or {}).get("id")
+
+        for key in ("dashboard", "tasks", "kanban", "projects"):
+            page = self.pages.get(key)
+            if page is not None and hasattr(page, "user_id"):
+                page.user_id = user_id
+
+        self.refresh_notifications()
+
+        if self.auth_service.access_token and self.realtime is None:
+            self.realtime = RealtimeClient(
+                self.api.base_url,
+                self.auth_service.access_token,
+                self,
+            )
+            self.realtime.event_received.connect(self.on_realtime_event)
+            self.realtime.connect()
+
     def toggle_theme(self):
         self.theme_manager.toggle()
         self.sidebar.set_theme(self.theme_manager.current_theme)
@@ -133,4 +192,3 @@ class MainWindow(QWidget):
 
         if self.on_logout:
             self.on_logout()
-

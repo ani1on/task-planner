@@ -2,7 +2,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QLineEdit,
+    QMenu,
     QPushButton,
 )
 
@@ -13,10 +13,11 @@ from .badge import Badge
 
 
 class Header(QFrame):
-    """Верхняя панель: поиск, уведомления и профиль."""
+    """Верхняя панель: уведомления и профиль."""
 
-    search_changed = Signal(str)
     notifications_requested = Signal()
+    profile_requested = Signal()
+    logout_requested = Signal()
 
     def __init__(self, user: dict | None = None, parent=None):
         super().__init__(parent)
@@ -28,16 +29,6 @@ class Header(QFrame):
         layout.setContentsMargins(24, 0, 24, 0)
         layout.setSpacing(12)
 
-        self.search = QLineEdit()
-        self.search.setObjectName("SearchInput")
-        self.search.setPlaceholderText("Поиск по задачам, проектам и заметкам")
-        self.search.setFixedWidth(340)
-        self.search.addAction(
-            make_icon("search"),
-            QLineEdit.ActionPosition.LeadingPosition,
-        )
-        self.search.textChanged.connect(self.search_changed.emit)
-
         notifications = QPushButton()
         notifications.setIcon(make_icon("bell"))
         notifications.setIconSize(QSize(20, 20))
@@ -46,14 +37,20 @@ class Header(QFrame):
         notifications.setProperty("icon", "true")
         notifications.clicked.connect(self.notifications_requested.emit)
 
-        unread = Badge("2", "danger")
+        self.notifications_button = notifications
+
+        self.unread_badge = Badge("0", "danger")
+        self.unread_badge.hide()
 
         self.avatar = Avatar("", size=36)
+        self.avatar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.avatar.mousePressEvent = lambda event: self._show_avatar_menu()
 
-        layout.addWidget(self.search)
+        self.avatar_menu = QMenu(self)
+
         layout.addStretch()
         layout.addWidget(notifications)
-        layout.addWidget(unread)
+        layout.addWidget(self.unread_badge)
         layout.addWidget(self.avatar)
 
         self.set_user(user)
@@ -61,3 +58,26 @@ class Header(QFrame):
     def set_user(self, user: dict | None):
         user = user or {}
         self.avatar.set_name(user.get("nick_name") or "Гость")
+        self._user = user
+
+        self.avatar_menu.clear()
+        name = user.get("nick_name") or "Гость"
+        email = user.get("email") or ""
+
+        info = self.avatar_menu.addAction(f"{name}\n{email}".strip())
+        info.setEnabled(False)
+        self.avatar_menu.addSeparator()
+
+        settings_action = self.avatar_menu.addAction("Настройки")
+        settings_action.triggered.connect(self.profile_requested.emit)
+
+        logout_action = self.avatar_menu.addAction("Выйти")
+        logout_action.triggered.connect(self.logout_requested.emit)
+
+    def _show_avatar_menu(self):
+        self.avatar_menu.exec(self.avatar.mapToGlobal(self.avatar.rect().bottomLeft()))
+
+    def set_unread_count(self, count: int):
+        count = max(0, int(count or 0))
+        self.unread_badge.setText(str(count))
+        self.unread_badge.setVisible(count > 0)

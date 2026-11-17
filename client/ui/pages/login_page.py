@@ -27,7 +27,6 @@ class LoginPage(QWidget):
         auth_service: AuthService,
         on_login=None,
         on_register=None,
-        on_demo=None,
         parent=None,
     ):
         super().__init__(parent)
@@ -35,7 +34,6 @@ class LoginPage(QWidget):
         self.auth_service = auth_service
         self.on_login = on_login
         self.on_register = on_register
-        self.on_demo = on_demo
 
         self.setObjectName("AuthScreen")
 
@@ -88,17 +86,6 @@ class LoginPage(QWidget):
                 "Зарегистрироваться",
                 on_click=self.open_register,
             )
-        )
-
-        # Временная кнопка: открывает каркас без запущенного backend.
-        self.demo_button = LinkButton(
-            "Посмотреть демо (без сервера)",
-            self.open_demo,
-        )
-        card.footer.addWidget(
-            self.demo_button,
-            0,
-            Qt.AlignmentFlag.AlignHCenter,
         )
 
         row = QHBoxLayout()
@@ -162,9 +149,15 @@ class LoginPage(QWidget):
         if self.on_register:
             self.on_register()
 
-    def open_demo(self):
-        if self.on_demo:
-            self.on_demo()
+    def show_registration_success(self):
+        self.form_error.show_message(
+            "Аккаунт создан. Теперь войдите, используя email и пароль.",
+            variant="success",
+        )
+
+    def set_session_checking(self, checking: bool):
+        self.submit_button.setEnabled(not checking)
+        self.submit_button.setText("Проверка сессии..." if checking else "Войти")
 
     def _validate(self) -> bool:
         valid = True
